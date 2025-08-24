@@ -44,4 +44,5 @@ func main(){
 		return
 	}
 	fmt.Println(string(body))
+	// https://medium.com/@hakimnaufal/simple-go-http-requests-get-and-response-handling-b6fd83d62a5e
 }
