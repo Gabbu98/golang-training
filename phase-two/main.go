@@ -1,48 +1,93 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/Gabbu98.golang-training-phase-two/models"
+	"github.com/sirupsen/logrus"
 )
 
-func main(){
-	// create a new http client
-	client := &http.Client{
-		Timeout: time.Second * 10, // timeout for every request
-	}
+func httpClient() *http.Client {
+	return &http.Client{}
+}
 
-	// make a POST request
-	url := "https://example.com/api"
-	method := "POST"
-	payload := strings.NewReader(`{"key1":"val1", "key2":"val2"}`)
-
-	req, err := http.NewRequest(method,url,payload)
+func requestNew(ctx context.Context, httpMethod, uri string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, httpMethod, uri, body)
 	if err != nil {
-		fmt.Println("Error creating request", err)
-		return
+		fmt.Println("Error creating request:", err)
+		return req, err
 	}
 
-	// Set headers
-	req.Header.Add("Content-Type","application/json")
-	req.Header.Add("Authorization", "Bearer TOKEN")
+	req.Header.Add("Content-Type", "application/json")
 
-	// exec request
-	response, err := client.Do(req)
+	return req, nil
+}
+
+func execRequest(request *http.Request, bodyInterface interface{}) (status int, err error) {
+	resp, err := httpClient().Do(request)
 	if err != nil {
 		fmt.Println("Error making request:", err)
 		return
 	}
-	defer response.Body.Close()
 
-	// read and print response
-	body, err := io.ReadAll(response.Body)
+	status = resp.StatusCode
+	defer resp.Body.Close()
+
+	// check for success status
+	if resp.StatusCode != http.StatusOK {
+		return resp.StatusCode, fmt.Errorf("error: received status code %d", resp.StatusCode)
+	}
+
+	// Decode json
+	decoder := json.NewDecoder(resp.Body)
+	if bodyInterface != nil {
+		if err = decoder.Decode(bodyInterface); err != nil {
+			return status, fmt.Errorf("error decoding response body: %v", err)
+		}
+	}
+
+	return
+}
+
+func GetPokemonDetails(ctx context.Context, pokemonName string) (response *models.PokemonDetails, status int, err error) {
+	req, err := requestNew(ctx, http.MethodGet, fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", strings.ToLower(pokemonName)), nil)
 	if err != nil {
-		fmt.Println("Error reading response body:", err)
+		return response, http.StatusInternalServerError, err
+	}
+
+	status, err = execRequest(req, &response)
+	if err != nil {
 		return
 	}
-	fmt.Println(string(body))
-	// https://medium.com/@hakimnaufal/simple-go-http-requests-get-and-response-handling-b6fd83d62a5e
+
+	return
+}
+
+func testHttpClient() {
+	ctx := context.Background()
+	resData, status, err := GetPokemonDetails(ctx, "metapod")
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
+	switch status {
+	case http.StatusOK:
+		jsonjson, _ := json.Marshal(resData)
+		logrus.Info(string(jsonjson))
+	default:
+		err = fmt.Errorf("response api %v", status)
+		logrus.Error(err)
+		return
+	}
+}
+
+func main() {
+
+
 }
