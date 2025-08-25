@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Gabbu98.golang-training-phase-two/models"
 	"github.com/gin-gonic/gin"
@@ -90,10 +92,25 @@ func testHttpClient() {
 	}
 }
 
-func routingTraining() {
+func authenticationRequired() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		apiKey := ctx.GetHeader("X-API-KEY")
+		if apiKey != "secret123" {
+			ctx.JSON(401, gin.H{"error":"Unauthorized"})
+			ctx.Abort()
+			return
+		}
+		ctx.Next()
+	}
+}
+
+func routingTraining() *gin.Engine {
 	var students = []int{1,2,3,4,5}
 	// Create a router with default middleware: logger & recovery
-	r := gin.Default()
+	r := gin.New() // to overide gin.Default()
+
+	// r.Use(requestTimer())
+	r.Use(gin.Recovery())
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -113,7 +130,9 @@ func routingTraining() {
 		c.JSON(200, gin.H{"status": "deleted"})
 	})
 
+
 	studentRoutes:=r.Group("/students") 
+	studentRoutes.Use(requestTimer(),authenticationRequired())
 	{
 		// Parameters
 		studentRoutes.GET("/:id", func (c *gin.Context)  {
@@ -152,10 +171,25 @@ func routingTraining() {
 		})
 	}
 	
-	r.Run(":8080")
+	return r
+}
+
+func requestTimer() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+
+		// process request
+		c.Next()
+
+		//after request
+		duration := time.Since(start)
+		log.Printf("Request %s %s took %v", c.Request.Method, c.Request.URL.Path, duration)
+	}
 }
 
 func main() {
-	
+
+	r:=routingTraining()
+	r.Run(":8080")
 
 }
