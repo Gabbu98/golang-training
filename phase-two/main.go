@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Gabbu98.golang-training-phase-two/models"
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
@@ -87,7 +90,72 @@ func testHttpClient() {
 	}
 }
 
-func main() {
+func routingTraining() {
+	var students = []int{1,2,3,4,5}
+	// Create a router with default middleware: logger & recovery
+	r := gin.Default()
 
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"response": "pong",
+		})
+	})
+
+	r.POST("/submit", func(c *gin.Context){
+		c.JSON(200, gin.H{"status": "submitted"})
+	})
+
+	r.PUT("/update", func(c *gin.Context){
+		c.JSON(200, gin.H{"status": "updated"})
+	})
+
+	r.DELETE("/delete", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "deleted"})
+	})
+
+	studentRoutes:=r.Group("/students") 
+	{
+		// Parameters
+		studentRoutes.GET("/:id", func (c *gin.Context)  {
+			id , err := strconv.Atoi(c.Param("id"))
+			if err != nil {
+				c.JSON(400, gin.H{"error":"Bad Request"})
+				return
+			}
+			if slices.Contains(students, id) {
+				c.JSON(200, gin.H{"status": "Student found!"})
+				return
+			}
+
+			c.JSON(404, gin.H{"status": "Student not found!"})
+		})
+
+		studentRoutes.GET("/", func (c *gin.Context)  {
+			q := c.Query("largerThan")
+			var query int
+			var err error
+			if q != "" {
+				query, err = strconv.Atoi(q) // Get query param ?largerThan=
+				if err != nil {
+					c.JSON(400, gin.H{"error":"Bad Request"})
+					return
+				}
+			}
+
+			var students_filtered = []int{}
+			for _, res := range students {
+				if res > query {
+					students_filtered = append(students_filtered, res)
+				}
+			}
+			c.JSON(200, gin.H{"response": students_filtered})
+		})
+	}
+	
+	r.Run(":8080")
+}
+
+func main() {
+	
 
 }
